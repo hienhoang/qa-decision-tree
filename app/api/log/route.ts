@@ -6,26 +6,26 @@ function getSheetsUrl() {
   return url;
 }
 
-async function fetchFollowingRedirects(url: string, options: RequestInit = {}): Promise<string> {
-  let currentUrl = url;
-  let res = await fetch(currentUrl, { ...options, redirect: "manual" });
-
-  let hops = 0;
-  while (res.status >= 300 && res.status < 400 && hops < 5) {
-    const redirectUrl = res.headers.get("location");
-    if (!redirectUrl) break;
-    currentUrl = redirectUrl;
-    res = await fetch(currentUrl, { redirect: "manual" });
-    hops++;
+async function fetchSheets(url: string, options: RequestInit = {}): Promise<string> {
+  if (options.method === "POST") {
+    const res = await fetch(url, { ...options, redirect: "manual" });
+    if (res.status >= 300 && res.status < 400) {
+      const loc = res.headers.get("location");
+      if (loc) {
+        const r2 = await fetch(loc, { redirect: "follow" });
+        return r2.text();
+      }
+    }
+    return res.text();
   }
-
+  const res = await fetch(url, { ...options, redirect: "follow" });
   return res.text();
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const text = await fetchFollowingRedirects(getSheetsUrl(), {
+    const text = await fetchSheets(getSheetsUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "create", ...body }),
@@ -42,7 +42,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const url = getSheetsUrl();
-    const text = await fetchFollowingRedirects(url);
+    const text = await fetchSheets(url);
     try {
       return NextResponse.json(JSON.parse(text));
     } catch {
@@ -57,7 +57,7 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const text = await fetchFollowingRedirects(getSheetsUrl(), {
+    const text = await fetchSheets(getSheetsUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "update", ...body }),
@@ -72,7 +72,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const body = await req.json();
-    const text = await fetchFollowingRedirects(getSheetsUrl(), {
+    const text = await fetchSheets(getSheetsUrl(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "delete", id: body.id }),
