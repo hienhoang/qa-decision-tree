@@ -243,79 +243,166 @@ function deriveFlags(answers: Record<string, string>, docLevel: string) {
   return { opinionFlag, opinionNote, specGapFlag };
 }
 
-function buildTicket(classification: string, severity: string, userScore: number, bizScore: number, answers: Record<string, string>, docLevel: string) {
-  const flow      = (answers["flow"]      || "Not specified").replace(/^\S+\s/, "");
-  const location  = (answers["location"]  || "Not specified").replace(/^\S+\s/, "");
-  const freq      = (answers["frequency"] || "Not specified").replace(/^\S+\s/, "");
-  const scope     = (answers["scope"]     || "Not specified").replace(/^\S+\s/, "");
-  const workaround= (answers["workaround"]|| "Not specified").replace(/^\S+\s/, "");
-  const confidence= (answers["confidence"]|| "Not specified").replace(/^\S+\s/, "");
-  const broke     = (answers["broke_how"] || answers["broke"] || "").replace(/^\S+\s/, "");
-  const feelsHow  = (answers["feels_how"] || answers["feels_off"] || "").replace(/^\S+\s/, "");
-  const docLabel  = { none: "None", partial: "Partial", full: "Full" }[docLevel] || "Unknown";
+function resolveLocation(answers: Record<string, string>) {
+  const strip = (s: string) => (s || "").replace(/^\S+\s/, "").trim();
+  const keys = ["location_ballot_feature","location_vg","location_global","location_other","location_ballot","location"];
+  for (const k of keys) {
+    const v = strip(answers[k] || "");
+    if (v) return v;
+  }
+  return "Not specified";
+}
 
-  const isCore  = flow.toLowerCase().includes("core");
+function buildTicket(classification: string, severity: string, userScore: number, bizScore: number, answers: Record<string, string>, docLevel: string) {
+  const strip     = (s: string) => (s || "").replace(/^\S+\s/, "").trim();
+  const flow      = strip(answers["flow"]      || "Not specified");
+  const location  = resolveLocation(answers);
+  const freq      = strip(answers["frequency"] || "Not specified");
+  const scope     = strip(answers["scope"]     || "Not specified");
+  const workaround= strip(answers["workaround"]|| "Not specified");
+  const confidence= strip(answers["confidence"]|| "Not specified");
+  const broke     = strip(answers["broke_how"] || answers["broke"] || "");
+  const feelsHow  = strip(answers["feels_how"] || answers["feels_off"] || "");
+  const docLabel  = { none: "None", partial: "Partial", full: "Full" }[docLevel] || "Unknown";
+  const opinion   = strip(answers["opinion"] || "");
+  const discussed = strip(answers["spec_gap"] || "");
+
+  const isCore    = flow.toLowerCase().includes("core");
   const flowLabel = isCore ? "Core" : flow.toLowerCase().includes("edge") ? "Edge Case" : "Supporting";
   const specFlag  = deriveFlags(answers, docLevel).specGapFlag ? "Yes" : "No";
+  const workaroundText = workaround.toLowerCase().includes("none") ? "None" : workaround.toLowerCase().includes("clunky") ? "Clunky workaround exists — see notes" : "Simple workaround exists";
 
-  const descMap: Record<string, string> = {
-    "Bug":            `A ${broke.toLowerCase() || "functional failure"} was observed in the ${location.toLowerCase() || "product"} during a ${flowLabel.toLowerCase()} flow. The issue occurs ${freq.toLowerCase() || "with unknown frequency"} and affects ${scope.toLowerCase() || "an unknown number of users"}.`,
-    "UX Improvement": `The ${location.toLowerCase() || "product area"} exhibits a UX issue: ${feelsHow.toLowerCase() || "something feels wrong"}. This is part of a ${flowLabel.toLowerCase()} flow and affects ${scope.toLowerCase() || "an unknown number of users"}.`,
-    "Feature Request":`A new capability is needed that the product does not currently support. This was identified in the ${location.toLowerCase() || "product"} during a ${flowLabel.toLowerCase()} flow.`,
-    "Spec Gap":       `Expected behavior for this area of the product (${location.toLowerCase() || "unknown location"}) has not been defined. Without a spec, this cannot be confidently classified or fixed.`,
-  };
-
-  const stepsMap: Record<string, string> = {
-    "Bug":            `1. Navigate to ${location.toLowerCase() || "the affected area"}\n2. Perform the action that triggers the issue\n3. Observe: ${broke.toLowerCase() || "unexpected behavior occurs"}`,
-    "UX Improvement": `1. Navigate to ${location.toLowerCase() || "the affected area"}\n2. Attempt to complete the relevant task\n3. Observe: ${feelsHow.toLowerCase() || "experience issue"}`,
-    "Feature Request":`1. Navigate to ${location.toLowerCase() || "the relevant area"}\n2. Attempt the action that is currently unsupported\n3. Observe: functionality does not exist`,
-    "Spec Gap":       `1. Navigate to ${location.toLowerCase() || "the affected area"}\n2. Observe the current behavior\n3. Note: no spec exists to confirm whether this is correct`,
-  };
-
-  const expectedMap: Record<string, string> = {
-    "Bug":            `The product should complete the action without error or unexpected behavior.`,
-    "UX Improvement": `The experience should feel intuitive and match user expectations.`,
-    "Feature Request":`The product should support this capability.`,
-    "Spec Gap":       `Expected behavior is undefined — needs product/design decision.`,
-  };
-
-  const actualMap: Record<string, string> = {
-    "Bug":            broke ? `${broke} occurred.` : `The product failed to behave as expected.`,
-    "UX Improvement": feelsHow ? `The experience is ${feelsHow.toLowerCase()}.` : `The experience feels off.`,
-    "Feature Request":`The capability does not exist.`,
-    "Spec Gap":       `Behavior exists but cannot be evaluated without a spec.`,
-  };
-
-  const workaroundText = workaround.toLowerCase().includes("none") ? "None" : workaround.toLowerCase().includes("clunky") ? "A clunky workaround exists — see notes" : "A simple workaround exists";
-
-  return [
-    `SUMMARY: [${classification}] ${broke || feelsHow || classification} in ${location || "product"} — ${flowLabel} flow`,
+  const header = [
+    `SUMMARY: [${classification}] ${broke || feelsHow || classification} in ${location} — ${flowLabel} flow`,
     `TYPE: ${classification}`,
     `SEVERITY: ${severity}`,
     `USER IMPACT: ${userScore}/5 — ${USER_IMPACT_LABELS[userScore]}`,
     `BUSINESS IMPACT: ${bizScore}/5 — ${BIZ_IMPACT_LABELS[bizScore]}`,
     `FLOW: ${flowLabel}`,
+    `LOCATION: ${location}`,
     `SPEC GAP FLAG: ${specFlag}`,
     `DOC LEVEL: ${docLabel}`,
+  ].join("\n");
+
+  if (classification === "Bug") {
+    return [
+      header,
+      ``,
+      `DESCRIPTION:`,
+      `A ${broke.toLowerCase() || "functional failure"} was observed in ${location} during a ${flowLabel.toLowerCase()} flow.`,
+      `The issue occurs ${freq.toLowerCase()} and affects ${scope.toLowerCase()}.`,
+      ``,
+      `STEPS TO REPRODUCE:`,
+      `1. Navigate to ${location}`,
+      `2. Perform the action that triggers the issue`,
+      `3. Observe: ${broke.toLowerCase() || "unexpected behavior occurs"}`,
+      ``,
+      `EXPECTED BEHAVIOR:`,
+      `The product should complete the action without error or unexpected behavior.`,
+      ``,
+      `ACTUAL BEHAVIOR:`,
+      broke ? `${broke} occurred.` : `The product failed to behave as expected.`,
+      ``,
+      `FREQUENCY: ${freq}`,
+      `WORKAROUND: ${workaroundText}`,
+      `SCOPE: ${scope}`,
+      ``,
+      `ENVIRONMENT:`,
+      `Browser: [fill in]`,
+      `Device: [fill in]`,
+      `URL: [fill in]`,
+      ``,
+      `NOTES:`,
+      `Confidence: ${confidence}. Documentation level: ${docLabel}.${specFlag === "Yes" ? " Spec gap flagged — needs product/design input before action." : ""}`,
+    ].join("\n");
+  }
+
+  if (classification === "UX Improvement") {
+    return [
+      header,
+      ``,
+      `USER STORY:`,
+      `As a user navigating ${location}, I expect the experience to be intuitive,`,
+      `but instead ${feelsHow.toLowerCase() || "something feels off"} — making the ${flowLabel.toLowerCase()} flow harder than it should be.`,
+      ``,
+      `WHAT'S HAPPENING:`,
+      `The ${location} exhibits a UX issue: ${feelsHow.toLowerCase() || "something feels wrong"}.`,
+      `This is part of a ${flowLabel.toLowerCase()} flow and affects ${scope.toLowerCase()}.`,
+      ``,
+      `STEPS TO OBSERVE:`,
+      `1. Navigate to ${location}`,
+      `2. Attempt to complete the relevant task`,
+      `3. Observe: ${feelsHow.toLowerCase() || "experience issue"}`,
+      ``,
+      `EXPECTED EXPERIENCE:`,
+      `The experience should feel intuitive and match user expectations.`,
+      ``,
+      `ACTUAL EXPERIENCE:`,
+      feelsHow ? `The experience is ${feelsHow.toLowerCase()}.` : `The experience feels off.`,
+      ``,
+      `WORKAROUND: ${workaroundText}`,
+      `SCOPE: ${scope}`,
+      opinion ? `OPINION NOTE: Reporter noted this may be ${opinion.toLowerCase()}.` : ``,
+      ``,
+      `NOTES:`,
+      `Confidence: ${confidence}. Documentation level: ${docLabel}.${specFlag === "Yes" ? " Spec gap flagged — needs product/design input before action." : ""}`,
+    ].filter(Boolean).join("\n");
+  }
+
+  if (classification === "Feature Request") {
+    const featureType = strip(answers["feature"] || answers["start"] || "");
+    return [
+      header,
+      ``,
+      `USER STORY:`,
+      `As a user in the ${location} area, I need a capability that doesn't currently exist,`,
+      `so that I can complete my task in the ${flowLabel.toLowerCase()} flow without a gap.`,
+      ``,
+      `WHAT'S MISSING:`,
+      `A new capability is needed that the product does not currently support.`,
+      featureType ? `Type: ${featureType}.` : ``,
+      `This was identified in ${location} during a ${flowLabel.toLowerCase()} flow.`,
+      ``,
+      `PROPOSED BEHAVIOR:`,
+      `The product should support this capability. [PM/Design to define specifics]`,
+      ``,
+      `SCOPE: ${scope}`,
+      `WORKAROUND: ${workaroundText}`,
+      ``,
+      `NOTES:`,
+      `Confidence: ${confidence}. Documentation level: ${docLabel}.`,
+    ].filter(Boolean).join("\n");
+  }
+
+  // Spec Gap
+  return [
+    header,
     ``,
-    `DESCRIPTION:`,
-    descMap[classification] || "",
+    `WHAT'S UNDEFINED:`,
+    `Expected behavior for ${location} has not been defined.`,
+    `Without a spec, this cannot be confidently classified, prioritized, or fixed.`,
     ``,
-    `STEPS TO REPRODUCE:`,
-    stepsMap[classification] || "",
+    `WHY THIS IS A SPEC GAP:`,
+    discussed === "Discussed but unresolved"
+      ? `This has been discussed before but no decision was reached. The ambiguity is known.`
+      : discussed === "Never discussed"
+      ? `This has never been discussed — the team may not know it's undefined.`
+      : `It's unclear whether this was ever considered. The behavior exists but has no defined intent.`,
     ``,
-    `EXPECTED BEHAVIOR:`,
-    expectedMap[classification] || "",
+    `CURRENT BEHAVIOR:`,
+    `Behavior exists in ${location} but cannot be evaluated without a spec.`,
+    feelsHow ? `Observation: ${feelsHow.toLowerCase()}.` : ``,
+    broke ? `Observation: ${broke.toLowerCase()}.` : ``,
     ``,
-    `ACTUAL BEHAVIOR:`,
-    actualMap[classification] || "",
+    `RECOMMENDED ACTION:`,
+    `Do not file as a bug or UX issue yet. Bring to PM + Design for alignment first.`,
     ``,
-    `WORKAROUND:`,
-    workaroundText,
+    `SCOPE: ${scope}`,
+    `FLOW: ${flowLabel}`,
     ``,
     `NOTES:`,
-    `Confidence: ${confidence}. Affects: ${scope.toLowerCase() || "unknown scope"}. Documentation level: ${docLabel}.${specFlag === "Yes" ? " ⚠️ Spec gap flagged — needs product/design input before action." : ""}`,
-  ].join("\n");
+    `Confidence: ${confidence}. Documentation level: ${docLabel}. This needs a product decision before it can be acted on.`,
+  ].filter(Boolean).join("\n");
 }
 
 // ── Decision tree nodes ───────────────────────────────────────────────────
@@ -456,6 +543,40 @@ function getEdges(nodes: Record<string, TreeNode>) {
   return edges;
 }
 
+// ── Sheets logging ────────────────────────────────────────────────────────
+const submitToSheet = async (resultObj: ResultData, answers: Record<string, string>, docLvl: string) => {
+  const url = process.env.NEXT_PUBLIC_SHEETS_URL;
+  if (!url) return;
+  const strip = (s: string) => (s || "").replace(/^\S+\s/, "").trim();
+  const location = resolveLocation(answers);
+  const payload = {
+    classification: resultObj.classification,
+    severity:       resultObj.severity,
+    flow:           strip(answers["flow"] || ""),
+    location,
+    docLevel:       docLvl,
+    userScore:      resultObj.userScore,
+    bizScore:       resultObj.bizScore,
+    specGapFlag:    resultObj.specGapFlag,
+    confidence:     strip(answers["confidence"] || ""),
+    workaround:     strip(answers["workaround"] || ""),
+    summary:        resultObj.jiraTicket.split("\n")[0].replace("SUMMARY: ", ""),
+    jiraTicket:     resultObj.jiraTicket,
+  };
+  try {
+    // Send as form data — Google Apps Script reliably parses this via e.parameter
+    const formData = new URLSearchParams();
+    Object.entries(payload).forEach(([k, v]) => formData.append(k, String(v)));
+    await fetch(url, {
+      method: "POST",
+      mode: "no-cors",
+      body: formData,
+    });
+  } catch (err) {
+    console.error("Sheet submission failed:", err);
+  }
+};
+
 // ── Doc screen ────────────────────────────────────────────────────────────
 function DocScreen({ onProceed }: { onProceed: (level: string) => void }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -562,7 +683,9 @@ export default function App() {
     const { opinionFlag, opinionNote, specGapFlag } = deriveFlags(allAns, dl);
     const severityExplanation = deriveSeverityExplanation(severity, allAns);
     const jiraTicket     = buildTicket(classification, severity, userScore, bizScore, allAns, dl);
-    setResult({ classification, severity, userScore, bizScore, reasoning, severityExplanation, opinionFlag, opinionNote, specGapFlag, jiraTicket });
+    const resultData = { classification, severity, userScore, bizScore, reasoning, severityExplanation, opinionFlag, opinionNote, specGapFlag, jiraTicket };
+    setResult(resultData);
+    submitToSheet(resultData, allAns, dl);
   };
 
   const back  = () => { if (path.length < 2) return; const a = { ...answers }; delete a[path[path.length-2]]; setAnswers(a); setPath(p => p.slice(0,-1)); };
