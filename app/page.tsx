@@ -544,14 +544,20 @@ function getEdges(nodes: Record<string, TreeNode>) {
 }
 
 // ── Sheets logging ────────────────────────────────────────────────────────
-const submitToSheet = async (resultObj: ResultData, answers: Record<string, string>, docLvl: string) => {
+let lastSubmittedId = "";
+const submitToSheet = async (resultObj: ResultData, answers: Record<string, string>, docLvl: string, title?: string) => {
   const strip = (s: string) => (s || "").replace(/^\S+\s/, "").trim();
   const location = resolveLocation(answers);
+  const shortId = Math.random().toString(36).slice(2, 6).toUpperCase();
+  const id = `QA-${Date.now()}-${shortId}`;
+  lastSubmittedId = id;
+  const defaultTitle = `Ticket #${shortId}`;
   try {
     const res = await fetch("/api/log", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        id,
         classification: resultObj.classification,
         severity:       resultObj.severity,
         flow:           strip(answers["flow"] || ""),
@@ -563,13 +569,28 @@ const submitToSheet = async (resultObj: ResultData, answers: Record<string, stri
         confidence:     strip(answers["confidence"] || ""),
         workaround:     strip(answers["workaround"] || ""),
         summary:        resultObj.jiraTicket.split("\n")[0].replace("SUMMARY: ", ""),
-        jiraTicket:     resultObj.jiraTicket,
+        title:          title || defaultTitle,
       }),
     });
     const data = await res.json();
     if (!data.success) console.error("Sheet log error:", data.error);
+    return defaultTitle;
   } catch (err) {
     console.error("Sheet submission failed:", err);
+    return defaultTitle;
+  }
+};
+
+const updateTitle = async (title: string) => {
+  if (!lastSubmittedId || !title.trim()) return;
+  try {
+    await fetch("/api/log", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: lastSubmittedId, title: title.trim() }),
+    });
+  } catch (err) {
+    console.error("Title update failed:", err);
   }
 };
 
@@ -587,7 +608,7 @@ function ScoreBar({ score, color }: { score: number; color: string }) {
 function DocScreen({ onProceed }: { onProceed: (level: string) => void }) {
   const [picked, setPicked] = useState<string | null>(null);
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: "linear-gradient(135deg,#0f0c29,#1e1b4b)" }}>
+    <div className="fixed inset-x-0 bottom-0 flex flex-col" style={{ top: "49px" }}>
       <div className="flex-1 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
@@ -646,6 +667,7 @@ export default function App() {
   const [copied, setCopied]     = useState(false);
   const [writeIn, setWriteIn]   = useState("");
   const [tab, setTab]           = useState("result");
+  const [ticketTitle, setTicketTitle] = useState("");
   const containerRef            = useRef<HTMLDivElement>(null);
 
   const NODES  = docLevel ? TREES[docLevel]   : TREES.none;
@@ -679,7 +701,7 @@ export default function App() {
     else { setWriteIn(""); setPath(p => [...p, next!]); }
   };
 
-  const finish = (allAns: Record<string, string>) => {
+  const finish = async (allAns: Record<string, string>) => {
     const dl = docLevel || "none";
     const classification = deriveClassification(allAns, dl);
     const userScore      = scoreUserImpact(allAns);
@@ -691,11 +713,12 @@ export default function App() {
     const jiraTicket     = buildTicket(classification, severity, userScore, bizScore, allAns, dl);
     const resultData = { classification, severity, userScore, bizScore, reasoning, severityExplanation, opinionFlag, opinionNote, specGapFlag, jiraTicket };
     setResult(resultData);
-    submitToSheet(resultData, allAns, dl);
+    const defaultTitle = await submitToSheet(resultData, allAns, dl);
+    setTicketTitle(defaultTitle);
   };
 
   const back  = () => { if (path.length < 2) return; const a = { ...answers }; delete a[path[path.length-2]]; setAnswers(a); setPath(p => p.slice(0,-1)); };
-  const reset = () => { setScreen("doc"); setDocLevel(null); setPath(["start"]); setAnswers({}); setResult(null); setTab("result"); };
+  const reset = () => { setScreen("doc"); setDocLevel(null); setPath(["start"]); setAnswers({}); setResult(null); setTab("result"); setTicketTitle(""); };
   const copy  = () => { if (!result) return; navigator.clipboard.writeText(result.jiraTicket); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
   if (screen === "doc") return <DocScreen onProceed={handleDoc} />;
@@ -705,12 +728,30 @@ export default function App() {
     const accent = accentHex[result.classification] || accentHex.default;
     const docBadge = { none: { label: "No docs", color: "bg-red-100 text-red-700" }, partial: { label: "Partial docs", color: "bg-yellow-100 text-yellow-700" }, full: { label: "Full docs", color: "bg-green-100 text-green-700" } }[docLevel || "none"]!;
     return (
-      <div className="min-h-screen py-10 px-4" style={{ background: "linear-gradient(135deg,#0f0c29,#1e1b4b)" }}>
+      <div className="min-h-screen py-10 px-4">
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-6">
             <div className="text-5xl mb-2">{classEmoji[result.classification]}</div>
             <h2 className="text-2xl font-bold text-white">Here&apos;s your verdict</h2>
             <p className="text-sm mt-1" style={{ color: "rgba(165,180,252,0.6)" }}>Ticket written. Zero typing required.</p>
+          </div>
+          <div className="mb-5 rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
+            <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "rgba(255,255,255,0.3)" }}>
+              Ticket Title
+            </label>
+            <input
+              value={ticketTitle}
+              onChange={e => setTicketTitle(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter" && ticketTitle.trim()) updateTitle(ticketTitle); }}
+              placeholder="e.g. Petition signature button unresponsive on mobile"
+              className="w-full px-4 py-3 rounded-xl text-base font-bold outline-none transition-all"
+              style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(99,102,241,0.3)", color: "white" }}
+              onFocus={e => e.currentTarget.style.borderColor = "rgba(99,102,241,0.7)"}
+              onBlur={e => { e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)"; if (ticketTitle.trim()) updateTitle(ticketTitle); }}
+            />
+            <p className="text-xs mt-1.5" style={{ color: "rgba(255,255,255,0.25)" }}>
+              This becomes the main title in your Ticket Log. Saves automatically.
+            </p>
           </div>
           <div className="flex gap-2 mb-5 rounded-2xl p-1.5" style={{ background: "rgba(255,255,255,0.07)" }}>
             {(["result","ticket","path"] as const).map(t => (
@@ -807,7 +848,7 @@ export default function App() {
   const layoutKeys = Object.keys(LAYOUT);
 
   return (
-    <div className="fixed inset-0 flex flex-col" style={{ background: "linear-gradient(135deg,#0f0c29,#1e1b4b)" }}>
+    <div className="fixed inset-x-0 bottom-0 flex flex-col" style={{ top: "49px" }}>
       <div className="flex justify-center pt-3 pb-1 shrink-0">
         <button onClick={() => { setScreen("doc"); setPath(["start"]); setAnswers({}); }}
           className="text-xs px-3 py-1 rounded-full font-semibold"

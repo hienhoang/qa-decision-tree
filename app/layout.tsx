@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { NavBar } from "./nav";
 
 export const metadata: Metadata = {
   title: "QA Decision Tree",
@@ -13,7 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="antialiased">
+      <body className="antialiased" style={{ background: "linear-gradient(135deg,#0f0c29,#1e1b4b)" }}>
+        <NavBar />
         {children}
       </body>
     </html>
