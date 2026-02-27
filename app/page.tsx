@@ -545,27 +545,29 @@ function getEdges(nodes: Record<string, TreeNode>) {
 
 // ── Sheets logging ────────────────────────────────────────────────────────
 const submitToSheet = async (resultObj: ResultData, answers: Record<string, string>, docLvl: string) => {
-  const url = process.env.NEXT_PUBLIC_SHEETS_URL;
-  if (!url) return;
   const strip = (s: string) => (s || "").replace(/^\S+\s/, "").trim();
   const location = resolveLocation(answers);
-  const payload = {
-    classification: resultObj.classification,
-    severity:       resultObj.severity,
-    flow:           strip(answers["flow"] || ""),
-    location,
-    docLevel:       docLvl,
-    userScore:      resultObj.userScore,
-    bizScore:       resultObj.bizScore,
-    specGapFlag:    resultObj.specGapFlag,
-    confidence:     strip(answers["confidence"] || ""),
-    workaround:     strip(answers["workaround"] || ""),
-    summary:        resultObj.jiraTicket.split("\n")[0].replace("SUMMARY: ", ""),
-    jiraTicket:     resultObj.jiraTicket,
-  };
   try {
-    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
-    navigator.sendBeacon(url, blob);
+    const res = await fetch("/api/log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        classification: resultObj.classification,
+        severity:       resultObj.severity,
+        flow:           strip(answers["flow"] || ""),
+        location,
+        docLevel:       docLvl,
+        userScore:      resultObj.userScore,
+        bizScore:       resultObj.bizScore,
+        specGapFlag:    resultObj.specGapFlag,
+        confidence:     strip(answers["confidence"] || ""),
+        workaround:     strip(answers["workaround"] || ""),
+        summary:        resultObj.jiraTicket.split("\n")[0].replace("SUMMARY: ", ""),
+        jiraTicket:     resultObj.jiraTicket,
+      }),
+    });
+    const data = await res.json();
+    if (!data.success) console.error("Sheet log error:", data.error);
   } catch (err) {
     console.error("Sheet submission failed:", err);
   }
