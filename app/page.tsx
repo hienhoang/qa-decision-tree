@@ -320,30 +320,30 @@ function buildTicket(classification: string, severity: string, userScore: number
   if (classification === "UX Improvement") {
     return [
       header,
-      ``,
+      "\n",
       `USER STORY:`,
       `As a user navigating ${location}, I expect the experience to be intuitive,`,
       `but instead ${feelsHow.toLowerCase() || "something feels off"} — making the ${flowLabel.toLowerCase()} flow harder than it should be.`,
-      ``,
+      "\n",
       `WHAT'S HAPPENING:`,
       `The ${location} exhibits a UX issue: ${feelsHow.toLowerCase() || "something feels wrong"}.`,
       `This is part of a ${flowLabel.toLowerCase()} flow and affects ${scope.toLowerCase()}.`,
-      ``,
+      "\n",
       `STEPS TO OBSERVE:`,
       `1. Navigate to ${location}`,
       `2. Attempt to complete the relevant task`,
       `3. Observe: ${feelsHow.toLowerCase() || "experience issue"}`,
-      ``,
+      "\n",
       `EXPECTED EXPERIENCE:`,
       `The experience should feel intuitive and match user expectations.`,
-      ``,
+      "\n",
       `ACTUAL EXPERIENCE:`,
       feelsHow ? `The experience is ${feelsHow.toLowerCase()}.` : `The experience feels off.`,
-      ``,
+      "\n",
       `WORKAROUND: ${workaroundText}`,
       `SCOPE: ${scope}`,
-      opinion ? `OPINION NOTE: Reporter noted this may be ${opinion.toLowerCase()}.` : ``,
-      ``,
+      opinion ? `OPINION NOTE: Reporter noted this may be ${opinion.toLowerCase()}.` : "",
+      "\n",
       `NOTES:`,
       `Confidence: ${confidence}. Documentation level: ${docLabel}.${specFlag === "Yes" ? " Spec gap flagged — needs product/design input before action." : ""}`,
     ].filter(Boolean).join("\n");
@@ -353,22 +353,22 @@ function buildTicket(classification: string, severity: string, userScore: number
     const featureType = strip(answers["feature"] || answers["start"] || "");
     return [
       header,
-      ``,
+      "\n",
       `USER STORY:`,
       `As a user in the ${location} area, I need a capability that doesn't currently exist,`,
       `so that I can complete my task in the ${flowLabel.toLowerCase()} flow without a gap.`,
-      ``,
+      "\n",
       `WHAT'S MISSING:`,
       `A new capability is needed that the product does not currently support.`,
-      featureType ? `Type: ${featureType}.` : ``,
+      featureType ? `Type: ${featureType}.` : "",
       `This was identified in ${location} during a ${flowLabel.toLowerCase()} flow.`,
-      ``,
+      "\n",
       `PROPOSED BEHAVIOR:`,
       `The product should support this capability. [PM/Design to define specifics]`,
-      ``,
+      "\n",
       `SCOPE: ${scope}`,
       `WORKAROUND: ${workaroundText}`,
-      ``,
+      "\n",
       `NOTES:`,
       `Confidence: ${confidence}. Documentation level: ${docLabel}.`,
     ].filter(Boolean).join("\n");
@@ -377,29 +377,29 @@ function buildTicket(classification: string, severity: string, userScore: number
   // Spec Gap
   return [
     header,
-    ``,
+    "\n",
     `WHAT'S UNDEFINED:`,
     `Expected behavior for ${location} has not been defined.`,
     `Without a spec, this cannot be confidently classified, prioritized, or fixed.`,
-    ``,
+    "\n",
     `WHY THIS IS A SPEC GAP:`,
     discussed === "Discussed but unresolved"
       ? `This has been discussed before but no decision was reached. The ambiguity is known.`
       : discussed === "Never discussed"
       ? `This has never been discussed — the team may not know it's undefined.`
       : `It's unclear whether this was ever considered. The behavior exists but has no defined intent.`,
-    ``,
+    "\n",
     `CURRENT BEHAVIOR:`,
     `Behavior exists in ${location} but cannot be evaluated without a spec.`,
-    feelsHow ? `Observation: ${feelsHow.toLowerCase()}.` : ``,
-    broke ? `Observation: ${broke.toLowerCase()}.` : ``,
-    ``,
+    feelsHow ? `Observation: ${feelsHow.toLowerCase()}.` : "",
+    broke ? `Observation: ${broke.toLowerCase()}.` : "",
+    "\n",
     `RECOMMENDED ACTION:`,
     `Do not file as a bug or UX issue yet. Bring to PM + Design for alignment first.`,
-    ``,
+    "\n",
     `SCOPE: ${scope}`,
     `FLOW: ${flowLabel}`,
-    ``,
+    "\n",
     `NOTES:`,
     `Confidence: ${confidence}. Documentation level: ${docLabel}. This needs a product decision before it can be acted on.`,
   ].filter(Boolean).join("\n");
@@ -570,6 +570,11 @@ const submitToSheet = async (resultObj: ResultData, answers: Record<string, stri
         workaround:     strip(answers["workaround"] || ""),
         summary:        resultObj.jiraTicket.split("\n")[0].replace("SUMMARY: ", ""),
         title:          title || defaultTitle,
+        jiraTicket:     resultObj.jiraTicket,
+        reasoning:      resultObj.reasoning,
+        severityExplanation: resultObj.severityExplanation,
+        opinionFlag:    resultObj.opinionFlag,
+        opinionNote:    resultObj.opinionNote,
       }),
     });
     const data = await res.json();
@@ -814,7 +819,7 @@ export default function App() {
                 <p className="text-xs font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.3)" }}>Jira Ticket Draft</p>
                 <button onClick={copy} className="text-xs px-3 py-1.5 rounded-lg font-semibold" style={{ background: "rgba(99,102,241,0.3)", color: "#a5b4fc" }}>{copied?"✅ Copied!":"Copy"}</button>
               </div>
-              <pre className="text-xs whitespace-pre-wrap leading-relaxed rounded-xl p-4 overflow-auto max-h-96" style={{ background: "rgba(0,0,0,0.3)", color: "rgba(255,255,255,0.7)" }}>{result.jiraTicket}</pre>
+              <pre className="text-xs whitespace-pre-wrap leading-relaxed rounded-xl p-5 overflow-auto max-h-96" style={{ background: "rgba(0,0,0,0.3)", color: "rgba(255,255,255,0.7)", lineHeight: 1.7 }}>{result.jiraTicket}</pre>
             </div>
           )}
 

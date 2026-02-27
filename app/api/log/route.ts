@@ -26,10 +26,24 @@ async function fetchSheets(url: string, options: RequestInit = {}): Promise<stri
   return res.text();
 }
 
+function isHtmlResponse(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.startsWith("<!") || trimmed.startsWith("<html") || trimmed.startsWith("<?xml");
+}
+
 async function fetchLogFromSheets() {
   const url = getSheetsUrl();
   const text = await fetchSheets(url);
-  return JSON.parse(text);
+  if (isHtmlResponse(text)) {
+    throw new Error(
+      "Google Apps Script returned an error page instead of JSON. Check: (1) Open the Apps Script editor and run the script — fix any errors. (2) Deployment → Manage deployments → redeploy; if prompted, re-authorize. (3) Deployment settings → ensure 'Execute as: Me' (not 'User accessing'). (4) Wait a few minutes if you hit quota limits."
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid response from Sheets — ${text.slice(0, 200)}`);
+  }
 }
 
 const getCachedLog = unstable_cache(fetchLogFromSheets, [CACHE_TAG], { revalidate: CACHE_REVALIDATE, tags: [CACHE_TAG] });
@@ -57,8 +71,9 @@ export async function GET() {
     const data = await getCachedLog();
     return NextResponse.json(data);
   } catch (err) {
-    console.error("Sheets fetch error:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Sheets fetch error:", msg);
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
 
