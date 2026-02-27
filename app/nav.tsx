@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useRef } from "react";
 
 export function NavBar() {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const prefetched = useRef(false);
+
+  const prefetchLog = () => {
+    if (!prefetched.current && pathname !== "/log") {
+      prefetched.current = true;
+      fetch("/api/log").catch(() => { prefetched.current = false; });
+    }
+  };
 
   return (
     <div className="relative z-50 flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
@@ -27,6 +36,8 @@ export function NavBar() {
 
       <Link
         href="/log"
+        onMouseEnter={prefetchLog}
+        onFocus={prefetchLog}
         className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${pathname === "/log" ? "pointer-events-none opacity-50" : ""}`}
         style={{
           background: "rgba(255,255,255,0.07)",

@@ -78,8 +78,6 @@ export default function TicketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"result" | "details">("result");
-  const [titleInput, setTitleInput] = useState("");
-  const [titleSaved, setTitleSaved] = useState(false);
   const [editingJira, setEditingJira] = useState(false);
   const [jiraInput, setJiraInput] = useState("");
 
@@ -93,7 +91,6 @@ export default function TicketDetailPage() {
         const found = data.entries.find((e: LogEntry) => e.id === decodeURIComponent(ticketId));
         if (found) {
           setEntry(found);
-          setTitleInput(found.title || `Ticket #${found.id.split("-").pop()?.toUpperCase() || found.id}`);
         } else {
           setError("Ticket not found.");
         }
@@ -108,18 +105,6 @@ export default function TicketDetailPage() {
   }, [ticketId]);
 
   useEffect(() => { fetchEntry(); }, [fetchEntry]);
-
-  const saveTitle = async () => {
-    if (!entry || !titleInput.trim()) return;
-    await fetch("/api/log", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: entry.id, title: titleInput.trim() }),
-    });
-    setTitleSaved(true);
-    setTimeout(() => setTitleSaved(false), 2000);
-    fetchEntry();
-  };
 
   const saveJira = async () => {
     if (!entry || !jiraInput.trim()) return;
@@ -169,36 +154,6 @@ export default function TicketDetailPage() {
           <p className="text-xs mt-1" style={{ color: "rgba(255,255,255,0.3)" }}>
             {entry.id} · {new Date(entry.timestamp).toLocaleString()}
           </p>
-        </div>
-
-        {/* Ticket Title with Save button */}
-        <div className="mb-5 rounded-2xl p-4" style={{ background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.1)" }}>
-          <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "rgba(255,255,255,0.3)" }}>
-            Ticket Title
-          </label>
-          <div className="flex gap-2">
-            <input
-              value={titleInput}
-              onChange={e => { setTitleInput(e.target.value); setTitleSaved(false); }}
-              onKeyDown={e => e.key === "Enter" && saveTitle()}
-              placeholder="e.g. Petition signature button unresponsive on mobile"
-              className="flex-1 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all"
-              style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(99,102,241,0.3)", color: "white" }}
-              onFocus={e => e.currentTarget.style.borderColor = "rgba(99,102,241,0.7)"}
-              onBlur={e => e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)"}
-            />
-            <button
-              onClick={saveTitle}
-              disabled={!titleInput.trim()}
-              className="px-4 py-3 rounded-xl text-xs font-bold shrink-0 transition-all"
-              style={{
-                background: titleSaved ? "rgba(34,197,94,0.3)" : titleInput.trim() ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,0.05)",
-                color: titleSaved ? "#86efac" : titleInput.trim() ? "white" : "rgba(255,255,255,0.25)",
-              }}
-            >
-              {titleSaved ? "✅ Saved" : "Save"}
-            </button>
-          </div>
         </div>
 
         {/* Tabs — same style as verdict */}

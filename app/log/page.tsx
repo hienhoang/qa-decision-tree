@@ -46,25 +46,34 @@ export default function LogPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [jiraInput, setJiraInput] = useState("");
-  const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
-  const [titleInput, setTitleInput] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const perPage = 20;
+  const CACHE_KEY = "ticket-log-cache";
+  const CACHE_MAX_AGE_MS = 60_000; // 1 min
 
-  const fetchEntries = useCallback(async () => {
+  const fetchEntries = useCallback(async (showCachedFirst = true) => {
+    if (showCachedFirst && typeof window !== "undefined") {
+      try {
+        const cached = sessionStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { entries: cachedEntries, ts } = JSON.parse(cached);
+          if (cachedEntries?.length >= 0 && ts && Date.now() - ts < CACHE_MAX_AGE_MS) {
+            setEntries(cachedEntries); // stored as newest-first
+            setLoading(false);
+          }
+        }
+      } catch { /* ignore stale cache */ }
+    }
     try {
       const res = await fetch("/api/log");
-      const text = await res.text();
-      let data;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        setError("Sheets returned invalid data. Check your Apps Script deployment.");
-        return;
-      }
+      const data = await res.json();
       if (data.entries) {
-        setEntries(data.entries.reverse());
+        const newestFirst = [...data.entries].reverse();
+        setEntries(newestFirst);
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem(CACHE_KEY, JSON.stringify({ entries: newestFirst, ts: Date.now() }));
+        }
       } else if (data.error) {
         setError(data.error + (data.raw ? ` — ${data.raw}` : ""));
       }
@@ -87,25 +96,9 @@ export default function LogPage() {
       });
       setEditingId(null);
       setJiraInput("");
-      fetchEntries();
+      fetchEntries(false);
     } catch (err) {
       console.error("Failed to update Jira link:", err);
-    }
-  };
-
-  const handleUpdateTitle = async (id: string) => {
-    if (!titleInput.trim()) return;
-    try {
-      await fetch("/api/log", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, title: titleInput.trim() }),
-      });
-      setEditingTitleId(null);
-      setTitleInput("");
-      fetchEntries();
-    } catch (err) {
-      console.error("Failed to update title:", err);
     }
   };
 
@@ -117,7 +110,7 @@ export default function LogPage() {
         body: JSON.stringify({ id }),
       });
       setDeletingId(null);
-      fetchEntries();
+      fetchEntries(false);
     } catch (err) {
       console.error("Failed to delete entry:", err);
     }
@@ -212,53 +205,7 @@ export default function LogPage() {
 
                 {/* Expanded detail */}
                 {isExpanded && (
-                  <div className="px-5 pb-5 space-y-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-                    {/* Title */}
-                    <div className="pt-4">
-                      <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "rgba(255,255,255,0.3)" }}>Ticket Title</p>
-                      {editingTitleId === entry.id ? (
-                        <div className="flex gap-2">
-                          <input
-                            autoFocus
-                            value={titleInput}
-                            onChange={e => setTitleInput(e.target.value)}
-                            onKeyDown={e => e.key === "Enter" && handleUpdateTitle(entry.id)}
-                            placeholder="Enter a ticket title..."
-                            className="flex-1 px-3 py-2 rounded-xl text-sm font-semibold outline-none"
-                            style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(99,102,241,0.5)", color: "white" }}
-                          />
-                          <button
-                            onClick={() => handleUpdateTitle(entry.id)}
-                            disabled={!titleInput.trim()}
-                            className="px-3 py-2 rounded-xl text-xs font-bold"
-                            style={{ background: titleInput.trim() ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,0.05)", color: titleInput.trim() ? "white" : "rgba(255,255,255,0.25)" }}
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => { setEditingTitleId(null); setTitleInput(""); }}
-                            className="px-2 py-2 rounded-xl text-xs"
-                            style={{ color: "rgba(255,255,255,0.4)" }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-white/90 flex-1">
-                            {entry.title || `Ticket #${entry.id.split("-").pop()?.toUpperCase() || entry.id}`}
-                          </p>
-                          <button
-                            onClick={() => { setEditingTitleId(entry.id); setTitleInput(entry.title || ""); }}
-                            className="text-xs px-2 py-0.5 rounded-lg shrink-0"
-                            style={{ color: "rgba(99,102,241,0.7)" }}
-                          >
-                            {entry.title ? "edit" : "+ Add title"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
+                  <div className="px-5 pt-4 pb-5 space-y-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                     {/* Details */}
                     <div>
                       <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "rgba(255,255,255,0.3)" }}>Details</p>
