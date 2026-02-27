@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 
 export function NavBar() {
   const pathname = usePathname();
-  const isLog = pathname === "/log";
+  const isHome = pathname === "/";
 
   return (
     <div className="relative z-50 flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-      {isLog ? (
+      {!isHome ? (
         <Link
           href="/"
           className="text-xs px-3 py-1.5 rounded-full font-semibold transition-all"
@@ -27,7 +27,7 @@ export function NavBar() {
 
       <Link
         href="/log"
-        className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${isLog ? "pointer-events-none opacity-50" : ""}`}
+        className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-all ${pathname === "/log" ? "pointer-events-none opacity-50" : ""}`}
         style={{
           background: "rgba(255,255,255,0.07)",
           color: "rgba(165,180,252,0.6)",

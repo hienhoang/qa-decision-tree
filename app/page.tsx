@@ -668,6 +668,7 @@ export default function App() {
   const [writeIn, setWriteIn]   = useState("");
   const [tab, setTab]           = useState("result");
   const [ticketTitle, setTicketTitle] = useState("");
+  const [titleSaved, setTitleSaved] = useState(false);
   const containerRef            = useRef<HTMLDivElement>(null);
 
   const NODES  = docLevel ? TREES[docLevel]   : TREES.none;
@@ -718,7 +719,7 @@ export default function App() {
   };
 
   const back  = () => { if (path.length < 2) return; const a = { ...answers }; delete a[path[path.length-2]]; setAnswers(a); setPath(p => p.slice(0,-1)); };
-  const reset = () => { setScreen("doc"); setDocLevel(null); setPath(["start"]); setAnswers({}); setResult(null); setTab("result"); setTicketTitle(""); };
+  const reset = () => { setScreen("doc"); setDocLevel(null); setPath(["start"]); setAnswers({}); setResult(null); setTab("result"); setTicketTitle(""); setTitleSaved(false); };
   const copy  = () => { if (!result) return; navigator.clipboard.writeText(result.jiraTicket); setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
   if (screen === "doc") return <DocScreen onProceed={handleDoc} />;
@@ -739,19 +740,29 @@ export default function App() {
             <label className="text-xs font-bold uppercase tracking-widest mb-2 block" style={{ color: "rgba(255,255,255,0.3)" }}>
               Ticket Title
             </label>
-            <input
-              value={ticketTitle}
-              onChange={e => setTicketTitle(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && ticketTitle.trim()) updateTitle(ticketTitle); }}
-              placeholder="e.g. Petition signature button unresponsive on mobile"
-              className="w-full px-4 py-3 rounded-xl text-base font-bold outline-none transition-all"
-              style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(99,102,241,0.3)", color: "white" }}
-              onFocus={e => e.currentTarget.style.borderColor = "rgba(99,102,241,0.7)"}
-              onBlur={e => { e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)"; if (ticketTitle.trim()) updateTitle(ticketTitle); }}
-            />
-            <p className="text-xs mt-1.5" style={{ color: "rgba(255,255,255,0.25)" }}>
-              This becomes the main title in your Ticket Log. Saves automatically.
-            </p>
+            <div className="flex gap-2">
+              <input
+                value={ticketTitle}
+                onChange={e => { setTicketTitle(e.target.value); setTitleSaved(false); }}
+                onKeyDown={e => { if (e.key === "Enter" && ticketTitle.trim()) { updateTitle(ticketTitle); setTitleSaved(true); setTimeout(() => setTitleSaved(false), 2000); } }}
+                placeholder="e.g. Petition signature button unresponsive on mobile"
+                className="flex-1 px-4 py-3 rounded-xl text-base font-bold outline-none transition-all"
+                style={{ background: "rgba(0,0,0,0.3)", border: "1px solid rgba(99,102,241,0.3)", color: "white" }}
+                onFocus={e => e.currentTarget.style.borderColor = "rgba(99,102,241,0.7)"}
+                onBlur={e => e.currentTarget.style.borderColor = "rgba(99,102,241,0.3)"}
+              />
+              <button
+                onClick={() => { if (ticketTitle.trim()) { updateTitle(ticketTitle); setTitleSaved(true); setTimeout(() => setTitleSaved(false), 2000); } }}
+                disabled={!ticketTitle.trim()}
+                className="px-4 py-3 rounded-xl text-xs font-bold shrink-0 transition-all"
+                style={{
+                  background: titleSaved ? "rgba(34,197,94,0.3)" : ticketTitle.trim() ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,0.05)",
+                  color: titleSaved ? "#86efac" : ticketTitle.trim() ? "white" : "rgba(255,255,255,0.25)",
+                }}
+              >
+                {titleSaved ? "✅ Saved" : "Save"}
+              </button>
+            </div>
           </div>
           <div className="flex gap-2 mb-5 rounded-2xl p-1.5" style={{ background: "rgba(255,255,255,0.07)" }}>
             {(["result","ticket","path"] as const).map(t => (
@@ -834,7 +845,7 @@ export default function App() {
               </div>
             </div>
           )}
-          <button onClick={reset} className="mt-4 w-full py-3 rounded-2xl font-semibold text-sm border" style={{ background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }}>← Classify another issue</button>
+          <button onClick={reset} className="mt-4 w-full py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.5)", color: "#a5b4fc" }}>← Classify another issue</button>
         </div>
       </div>
     );
