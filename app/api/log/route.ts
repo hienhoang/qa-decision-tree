@@ -37,9 +37,12 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
-    const text = await fetchFollowingRedirects(getSheetsUrl() + "?action=list");
+    const url = getSheetsUrl();
+    const text = await fetchFollowingRedirects(url);
     try {
       return NextResponse.json(JSON.parse(text));
     } catch {

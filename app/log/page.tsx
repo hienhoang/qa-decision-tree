@@ -49,6 +49,8 @@ export default function LogPage() {
   const [editingTitleId, setEditingTitleId] = useState<string | null>(null);
   const [titleInput, setTitleInput] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const perPage = 20;
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -62,7 +64,7 @@ export default function LogPage() {
         return;
       }
       if (data.entries) {
-        setEntries(data.entries);
+        setEntries(data.entries.reverse());
       } else if (data.error) {
         setError(data.error + (data.raw ? ` — ${data.raw}` : ""));
       }
@@ -166,7 +168,7 @@ export default function LogPage() {
         )}
 
         <div className="space-y-3">
-          {entries.map((entry) => {
+          {entries.slice((page - 1) * perPage, page * perPage).map((entry) => {
             const isExpanded = expandedId === entry.id;
             return (
               <div
@@ -371,6 +373,40 @@ export default function LogPage() {
             );
           })}
         </div>
+
+        {entries.length > perPage && (
+          <div className="flex items-center justify-between mt-6 pt-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            <button
+              onClick={() => { setPage(p => p - 1); setExpandedId(null); }}
+              disabled={page <= 1}
+              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{
+                background: page > 1 ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+                color: page > 1 ? "#a5b4fc" : "rgba(255,255,255,0.15)",
+                border: `1px solid ${page > 1 ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.06)"}`,
+                cursor: page > 1 ? "pointer" : "not-allowed",
+              }}
+            >
+              ← Previous
+            </button>
+            <p className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.4)" }}>
+              Page {page} of {Math.ceil(entries.length / perPage)} · {entries.length} tickets
+            </p>
+            <button
+              onClick={() => { setPage(p => p + 1); setExpandedId(null); }}
+              disabled={page >= Math.ceil(entries.length / perPage)}
+              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{
+                background: page < Math.ceil(entries.length / perPage) ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+                color: page < Math.ceil(entries.length / perPage) ? "#a5b4fc" : "rgba(255,255,255,0.15)",
+                border: `1px solid ${page < Math.ceil(entries.length / perPage) ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.06)"}`,
+                cursor: page < Math.ceil(entries.length / perPage) ? "pointer" : "not-allowed",
+              }}
+            >
+              Next →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
