@@ -573,6 +573,16 @@ const submitToSheet = async (resultObj: ResultData, answers: Record<string, stri
   }
 };
 
+// ── Score bar ─────────────────────────────────────────────────────────────
+function ScoreBar({ score, color }: { score: number; color: string }) {
+  return (
+    <div className="flex gap-1 items-center mt-1">
+      {[1,2,3,4,5].map(i => <div key={i} className={`h-2 w-7 rounded-full ${i <= score ? color : "bg-gray-200"}`} />)}
+      <span className="text-xs text-gray-400 ml-1">{score}/5</span>
+    </div>
+  );
+}
+
 // ── Doc screen ────────────────────────────────────────────────────────────
 function DocScreen({ onProceed }: { onProceed: (level: string) => void }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -687,13 +697,6 @@ export default function App() {
   const back  = () => { if (path.length < 2) return; const a = { ...answers }; delete a[path[path.length-2]]; setAnswers(a); setPath(p => p.slice(0,-1)); };
   const reset = () => { setScreen("doc"); setDocLevel(null); setPath(["start"]); setAnswers({}); setResult(null); setTab("result"); };
   const copy  = () => { if (!result) return; navigator.clipboard.writeText(result.jiraTicket); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-
-  const ScoreBar = ({ score, color }: { score: number; color: string }) => (
-    <div className="flex gap-1 items-center mt-1">
-      {[1,2,3,4,5].map(i => <div key={i} className={`h-2 w-7 rounded-full ${i <= score ? color : "bg-gray-200"}`} />)}
-      <span className="text-xs text-gray-400 ml-1">{score}/5</span>
-    </div>
-  );
 
   if (screen === "doc") return <DocScreen onProceed={handleDoc} />;
 
