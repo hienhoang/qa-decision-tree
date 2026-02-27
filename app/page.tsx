@@ -564,14 +564,8 @@ const submitToSheet = async (resultObj: ResultData, answers: Record<string, stri
     jiraTicket:     resultObj.jiraTicket,
   };
   try {
-    // Send as form data — Google Apps Script reliably parses this via e.parameter
-    const formData = new URLSearchParams();
-    Object.entries(payload).forEach(([k, v]) => formData.append(k, String(v)));
-    await fetch(url, {
-      method: "POST",
-      mode: "no-cors",
-      body: formData,
-    });
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    navigator.sendBeacon(url, blob);
   } catch (err) {
     console.error("Sheet submission failed:", err);
   }
